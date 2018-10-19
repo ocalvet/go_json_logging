@@ -1,10 +1,15 @@
 package main
 
 import (
-	log "github.com/Sirupsen/logrus"
+	"net/http"
+
+	"github.com/go-chi/chi"
 )
 
 func main() {
-	log.SetFormatter(&log.JSONFormatter{})
-	log.Println("Hello There.")
+	r := chi.NewRouter()
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("welcome"))
+	})
+	http.ListenAndServe(":2018", r)
 }
