@@ -1,0 +1,10 @@
+GET http://localhost:2018
+
+###
+GET http://localhost:2018/todo
+
+###
+POST http://localhost:2018/todo
+Content-Type: text/plain
+
+Todo number 2
