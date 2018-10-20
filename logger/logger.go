@@ -6,20 +6,29 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/middleware"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
-func NewStructuredLogger(logger *logrus.Logger) func(next http.Handler) http.Handler {
-	return middleware.RequestLogger(&StructuredLogger{logger})
+type Logger interface {
+	NewLogEntry(r *http.Request) middleware.LogEntry
+}
+
+func NewLogger() *StructuredLogger {
+	return &StructuredLogger{}
+}
+
+func NewStructuredLogger(logger Logger) func(next http.Handler) http.Handler {
+	return middleware.RequestLogger(logger)
 }
 
 type StructuredLogger struct {
-	Logger *logrus.Logger
 }
 
 func (l *StructuredLogger) NewLogEntry(r *http.Request) middleware.LogEntry {
-	entry := &StructuredLoggerEntry{Logger: logrus.NewEntry(l.Logger)}
-	logFields := logrus.Fields{}
+	entry := &StructuredLoggerEntry{Logger: log.Log()}
+
+	logFields := map[string]interface{}{}
 
 	logFields["ts"] = time.Now().UTC().Format(time.RFC1123)
 
@@ -40,29 +49,30 @@ func (l *StructuredLogger) NewLogEntry(r *http.Request) middleware.LogEntry {
 
 	logFields["uri"] = fmt.Sprintf("%s://%s%s", scheme, r.Host, r.RequestURI)
 
-	entry.Logger = entry.Logger.WithFields(logFields)
+	entry.Logger = entry.Logger.Fields(logFields)
 
-	entry.Logger.Infoln("request started")
+	entry.Logger.Msg("request started")
 
 	return entry
 }
 
 type StructuredLoggerEntry struct {
-	Logger logrus.FieldLogger
+	Logger *zerolog.Event
 }
 
 func (l *StructuredLoggerEntry) Write(status, bytes int, elapsed time.Duration) {
-	l.Logger = l.Logger.WithFields(logrus.Fields{
+	l.Logger = l.Logger.Fields(map[string]interface{}{
 		"resp_status": status, "resp_bytes_length": bytes,
 		"resp_elapsed_ms": float64(elapsed.Nanoseconds()) / 1000000.0,
 	})
 
-	l.Logger.Infoln("request complete")
+	l.Logger.Msg("request complete")
 }
 
 func (l *StructuredLoggerEntry) Panic(v interface{}, stack []byte) {
-	l.Logger = l.Logger.WithFields(logrus.Fields{
+	l.Logger = l.Logger.Fields(map[string]interface{}{
 		"stack": string(stack),
 		"panic": fmt.Sprintf("%+v", v),
 	})
+	l.Logger.Msg("request failed")
 }
